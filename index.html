@@ -2,62 +2,50 @@
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
-    <title>Ghost Admin & Exchange (Protected)</title>
+    <title>Ghost Exchange - Economy Update</title>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
-    
     <style>
-        :root { --bg: #0b0c0f; --panel: #16171d; --accent: #bb86fc; --text: #e1e1e1; }
+        :root { --bg: #0b0c0f; --panel: #16171d; --accent: #bb86fc; --text: #e1e1e1; --gold: #ffd700; }
         body { margin: 0; font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); overflow: hidden; }
         
-        /* Шапка завжди зверху, навіть над привидом */
-        .header { 
-            height: 60px; background: var(--panel); display: flex; 
-            align-items: center; padding: 0 20px; border-bottom: 1px solid #333; 
-            justify-content: space-between; position: relative; z-index: 10001; 
-        }
+        .header { height: 60px; background: var(--panel); display: flex; align-items: center; padding: 0 20px; border-bottom: 1px solid #333; justify-content: space-between; position: relative; z-index: 10001; }
+        .stats { display: flex; gap: 20px; align-items: center; }
+        .coin-balance { color: var(--gold); font-weight: bold; }
 
-        .wrapper { display: grid; grid-template-columns: 220px 1fr 300px; height: calc(100vh - 60px); position: relative; z-index: 1; }
-        
-        /* Екран помилки (Привид) */
-        .error-overlay { 
-            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
-            background: #000; z-index: 10000; text-align: center; 
-            justify-content: center; flex-direction: column; 
-        }
-        .ghost { width: 180px; animation: ghostFloat 3s infinite ease-in-out; }
-        @keyframes ghostFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-20px); } }
-
-        /* Картки та стрічка */
+        .wrapper { display: grid; grid-template-columns: 220px 1fr 300px; height: calc(100vh - 60px); }
         .feed { padding: 20px; overflow-y: auto; display: flex; flex-wrap: wrap; gap: 20px; }
-        .item-card { background: var(--panel); width: 230px; border-radius: 12px; border: 1px solid #333; padding-bottom: 10px; }
+        
+        .item-card { background: var(--panel); width: 230px; border-radius: 12px; border: 1px solid #333; overflow: hidden; position: relative; }
+        .price-tag { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.7); padding: 5px 10px; border-radius: 5px; color: var(--gold); font-size: 12px; }
         .item-img { width: 100%; height: 130px; object-fit: cover; background: #222; }
-        .item-info { padding: 12px; }
-        .item-desc { font-size: 13px; color: #888; display: block; margin: 5px 0; }
         
-        /* Адмінка */
         #admin-panel { display: none; position: fixed; top: 70px; left: 5%; width: 90%; height: 80%; background: #111; z-index: 20000; border: 2px solid var(--accent); padding: 20px; overflow-y: auto; border-radius: 15px; }
+        .promo-section { background: #1a1b21; padding: 15px; border-radius: 10px; margin-top: 20px; border: 1px dashed var(--accent); }
+
+        input, textarea, select { width: 100%; padding: 10px; margin: 5px 0; background: #25262b; border: 1px solid #444; color: white; border-radius: 8px; box-sizing: border-box; }
+        button { padding: 10px; background: var(--accent); border: none; border-radius: 8px; cursor: pointer; font-weight: bold; }
         
-        input, textarea { width: 100%; padding: 10px; margin: 5px 0; background: #25262b; border: 1px solid #444; color: white; border-radius: 8px; box-sizing: border-box; }
-        button { padding: 10px; background: var(--accent); border: none; border-radius: 8px; cursor: pointer; font-weight: bold; color: #000; }
-        
-        #reg-screen { position: fixed; width: 100%; height: 100%; background: var(--bg); z-index: 30000; display: flex; align-items: center; justify-content: center; }
+        .error-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 10000; text-align: center; justify-content: center; flex-direction: column; }
     </style>
 </head>
 <body>
 
-    <div id="reg-screen">
-        <div style="background:var(--panel); padding:30px; border-radius:15px; text-align:center; border: 1px solid #444; width:300px;">
-            <img src="image_7cdb7b.png" style="width:70px; margin-bottom:15px;">
+    <div id="reg-screen" style="position:fixed; width:100%; height:100%; background:var(--bg); z-index:30000; display:flex; align-items:center; justify-content:center;">
+        <div style="background:var(--panel); padding:30px; border-radius:15px; text-align:center; width:300px; border:1px solid #444;">
             <h2>Вхід</h2>
-            <input type="text" id="user-login" placeholder="Нікнейм Roblox">
+            <input type="text" id="user-login" placeholder="Нікнейм">
             <button onclick="startSession()" style="width:100%; margin-top:10px;">УВІЙТИ</button>
         </div>
     </div>
 
-    <div class="header" id="main-header">
-        <div style="color:var(--accent); font-weight:bold;">GHOST SYSTEM</div>
-        <div style="width:30px; height:30px; background:#333; border-radius:50%; cursor:pointer;" onclick="openAdmin()" title="Адмін-панель"></div>
+    <div class="header">
+        <div class="stats">
+            <span style="color:var(--accent); font-weight:bold;">GHOST SYSTEM</span>
+            <span class="coin-balance">💰 <span id="balance-val">0</span> Coins</span>
+            <button onclick="usePromo()" style="padding:5px 10px; font-size:12px;">ПРОМОКОД</button>
+        </div>
+        <div style="width:30px; height:30px; background:#333; border-radius:50%; cursor:pointer;" onclick="openAdmin()"></div>
     </div>
 
     <div class="wrapper" id="main-wrapper">
@@ -67,141 +55,173 @@
         </div>
         <div class="feed" id="main-feed"></div>
         <div class="chat-panel" style="background:var(--panel); border-left:1px solid #333; display:flex; flex-direction:column;">
-            <div id="chat-box" style="flex:1; padding:15px; overflow-y:auto;"></div>
-            <input type="text" id="chat-input" placeholder="Напиши..." style="border:none; border-top:1px solid #333; padding:15px; background:#1a1b21; color:white;" onkeypress="sendChat(event)">
+            <div id="chat-box" style="flex:1; padding:15px; overflow-y:auto; font-size: 14px;"></div>
+            <input type="text" id="chat-input" placeholder="Напиши (+10💰)..." style="border:none; border-top:1px solid #333; padding:15px;" onkeypress="sendChat(event)">
         </div>
-    </div>
-
-    <div id="errScr" class="error-overlay">
-        <img src="image_7cdb7b.png" class="ghost">
-        <h1 style="color:white; margin-top:20px;">Помилка 999</h1>
-        <p style="color:#888;">Ваш акаунт порушений. Зверніться до тех адміна.</p>
     </div>
 
     <div id="admin-panel">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-            <h2>Модерація</h2>
-            <button onclick="document.getElementById('admin-panel').style.display='none'">Закрити</button>
+        <div style="display:flex; justify-content:space-between;"><h2>Адмінка</h2><button onclick="this.parentElement.parentElement.style.display='none'">X</button></div>
+        
+        <div class="promo-section">
+            <h3>Створити Промокод</h3>
+            <input type="text" id="p-code" placeholder="Код (напр: GHOST2024)">
+            <select id="p-type">
+                <option value="coins">Дати 500 монет</option>
+                <option value="discount">Знижка на трейд</option>
+                <option value="free">Безплатний трейд</option>
+            </select>
+            <button onclick="createPromo()">ДОДАТИ ПРОМО</button>
+            <div id="active-promos" style="margin-top:10px; font-size:12px; color:#888;"></div>
         </div>
-        <div id="admin-list"></div>
+
+        <div id="admin-list" style="margin-top:20px;"></div>
     </div>
 
     <div id="addModal" class="error-overlay" style="background:rgba(0,0,0,0.8); z-index:15000;">
-        <div style="background:var(--panel); padding:25px; border-radius:15px; width:350px; text-align:left; border: 1px solid var(--accent);">
+        <div style="background:var(--panel); padding:25px; border-radius:15px; width:350px; text-align:left;">
             <h3>Новий пост</h3>
-            <input type="text" id="f-title" placeholder="Назва предмета">
+            <input type="text" id="f-title" placeholder="Назва">
             <input type="text" id="f-img" placeholder="URL картинки">
-            <textarea id="f-desc" placeholder="Опис (його буде видно)"></textarea>
+            <input type="text" id="f-price" placeholder="Ціна (напр: 500 Coins)">
+            <textarea id="f-desc" placeholder="Опис"></textarea>
             <button onclick="publish()" style="width:100%;">ОПУБЛІКУВАТИ</button>
             <button onclick="document.getElementById('addModal').style.display='none'" style="background:none; color:grey; margin-top:10px;">Назад</button>
         </div>
     </div>
 
-    <button id="add-btn-plus" style="position:fixed; bottom:20px; right:320px; width:60px; height:60px; border-radius:50%; background:var(--accent); border:none; font-size:30px; cursor:pointer; z-index:500;" onclick="document.getElementById('addModal').style.display='flex'">+</button>
+    <div id="errScr" class="error-overlay">
+        <img src="image_7cdb7b.png" style="width:150px;">
+        <h1>Помилка 999</h1>
+        <p>Вас забанено.</p>
+    </div>
+
+    <button id="add-btn" style="position:fixed; bottom:20px; right:320px; width:60px; height:60px; border-radius:50%; background:var(--accent); border:none; font-size:30px; cursor:pointer;" onclick="document.getElementById('addModal').style.display='flex'">+</button>
 
     <script>
-        // Конфігурація бази
         const firebaseConfig = { databaseURL: "https://book-main-1fc44-default-rtdb.firebaseio.com/" };
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
-        
         let myNick = localStorage.getItem('ghost_user') || "";
+        let myCoins = 0;
 
-        // ПЕРЕВІРКА БАНУ (Шапка залишається!)
-        function checkBanStatus(nick) {
+        // 1. ЕКОНОМІКА ТА БАН
+        function syncData(nick) {
+            // Слухаємо монети
+            db.ref('users').child(nick).child('coins').on('value', s => {
+                myCoins = s.val() || 0;
+                document.getElementById('balance-val').innerText = myCoins;
+            });
+            // Слухаємо бан
             db.ref('banned').child(nick).on('value', s => {
-                const isBanned = s.exists() && s.val() === true;
-                const err = document.getElementById('errScr');
-                const wrap = document.getElementById('main-wrapper');
-                const plus = document.getElementById('add-btn-plus');
-
-                if (isBanned) {
-                    err.style.display = 'flex';
-                    wrap.style.display = 'none'; // Ховаємо тільки контент
-                    if(plus) plus.style.display = 'none';
-                    document.getElementById('reg-screen').style.display = 'none';
-                } else {
-                    err.style.display = 'none';
-                    wrap.style.display = 'grid';
-                    if(plus) plus.style.display = 'block';
-                    if (myNick) document.getElementById('reg-screen').style.display = 'none';
-                }
+                const isBanned = s.exists();
+                document.getElementById('errScr').style.display = isBanned ? 'flex' : 'none';
+                document.getElementById('main-wrapper').style.display = isBanned ? 'none' : 'grid';
+                if(isBanned) document.getElementById('reg-screen').style.display = 'none';
             });
         }
 
         function startSession() {
-            const nick = document.getElementById('user-login').value.trim();
-            if (nick.length < 2) return alert("Надто короткий нік!");
-            myNick = nick;
-            localStorage.setItem('ghost_user', nick);
-            checkBanStatus(nick);
+            const n = document.getElementById('user-login').value.trim();
+            if(n.length < 2) return;
+            myNick = n;
+            localStorage.setItem('ghost_user', n);
+            document.getElementById('reg-screen').style.display = 'none';
+            syncData(n);
+        }
+        if(myNick) { syncData(myNick); document.getElementById('reg-screen').style.display = 'none'; }
+
+        // 2. ЧАТ (Нарахування валюти)
+        function sendChat(e) {
+            if(e.key === 'Enter' && e.target.value.trim() !== "") {
+                db.ref('chat').push({ user: myNick, text: e.target.value });
+                // Даємо +10 монет за повідомлення
+                db.ref('users').child(myNick).child('coins').set(myCoins + 10);
+                e.target.value = "";
+            }
         }
 
-        if (myNick) checkBanStatus(myNick);
+        // 3. ПРОМОКОДИ
+        function createPromo() {
+            const code = document.getElementById('p-code').value.toUpperCase();
+            const type = document.getElementById('p-type').value;
+            if(!code) return;
+            db.ref('promos').child(code).set({ type: type, active: true });
+            alert("Промокод створено!");
+        }
 
-        // ЗАВАНТАЖЕННЯ ДАНИХ
+        function usePromo() {
+            const code = prompt("Введіть промокод:").toUpperCase();
+            db.ref('promos').child(code).once('value', s => {
+                if(s.exists() && s.val().active) {
+                    const data = s.val();
+                    if(data.type === 'coins') {
+                        db.ref('users').child(myNick).child('coins').set(myCoins + 500);
+                        alert("Ви отримали 500 монет!");
+                    } else if(data.type === 'discount') {
+                        alert("Промокод активовано: Знижка активована на наступний трейд!");
+                    } else if(data.type === 'free') {
+                        alert("Промокод активовано: Безплатний трейд доступний!");
+                    }
+                    // Вимикаємо промокод після використання (якщо треба одноразовий)
+                    // db.ref('promos').child(code).remove(); 
+                } else {
+                    alert("Невірний або використаний код.");
+                }
+            });
+        }
+
+        // 4. ПУБЛІКАЦІЇ ТА АДМІНКА
         db.ref('posts').on('value', snapshot => {
             const feed = document.getElementById('main-feed');
             const alist = document.getElementById('admin-list');
-            feed.innerHTML = ""; alist.innerHTML = "";
-
+            feed.innerHTML = ""; alist.innerHTML = "<h3>Керування постами:</h3>";
             snapshot.forEach(child => {
                 const d = child.val();
-                const id = child.key;
-
                 feed.innerHTML += `
                     <div class="item-card">
-                        <img src="${d.img || ''}" class="item-img" onerror="this.src='https://via.placeholder.com/230x130?text=No+Photo'">
+                        <div class="price-tag">${d.price || 'Offer'}</div>
+                        <img src="${d.img || ''}" class="item-img" onerror="this.src='https://via.placeholder.com/230x130?text=No+Image'">
                         <div class="item-info">
-                            <b>${d.title}</b>
-                            <span class="item-desc">${d.desc || 'Немає опису'}</span>
-                            <span style="color:var(--accent); font-size:12px; font-weight:bold;">@${d.nick}</span>
+                            <b>${d.title}</b><br>
+                            <small style="color:#888;">${d.desc || ''}</small><br>
+                            <span style="color:var(--accent); font-size:12px;">@${d.nick}</span>
                         </div>
                     </div>`;
-
-                alist.innerHTML += `
-                    <div style="display:flex; justify-content:space-between; margin-bottom:10px; background:#222; padding:15px; border-radius:10px; align-items:center;">
-                        <span><b>${d.title}</b> (від ${d.nick})</span>
-                        <div>
-                            <button onclick="db.ref('banned').child('${d.nick}').set(true)" style="background:orange; margin-right:5px;">БАН</button>
-                            <button onclick="db.ref('banned').child('${d.nick}').remove()" style="background:green; margin-right:5px;">РОЗБАН</button>
-                            <button onclick="db.ref('posts').child('${id}').remove()" style="background:red;">ВИДАЛИТИ</button>
-                        </div>
-                    </div>`;
+                alist.innerHTML += `<div style="background:#222; padding:10px; margin-bottom:5px; border-radius:5px; display:flex; justify-content:space-between;">
+                    <span>${d.title} (@${d.nick})</span>
+                    <button onclick="db.ref('posts').child('${child.key}').remove()" style="background:red;">DEL</button>
+                    <button onclick="db.ref('banned').child('${d.nick}').set(true)" style="background:orange;">BAN</button>
+                </div>`;
             });
         });
 
         function publish() {
-            const t = document.getElementById('f-title').value;
-            if(!t) return alert("Введи назву!");
             db.ref('posts').push({
                 nick: myNick,
-                title: t,
+                title: document.getElementById('f-title').value,
                 img: document.getElementById('f-img').value,
+                price: document.getElementById('f-price').value,
                 desc: document.getElementById('f-desc').value
             });
             document.getElementById('addModal').style.display = 'none';
         }
 
         function openAdmin() {
-            // Навіть якщо забанений, prompt з'явиться
-            const p = prompt("Введіть пароль:");
-            if (p === "loldemid509") {
-                document.getElementById('admin-panel').style.display = 'block';
-            }
+            if(prompt("Пароль:") === "loldemid509") document.getElementById('admin-panel').style.display = 'block';
         }
 
-        function sendChat(e) {
-            if (e.key === 'Enter' && e.target.value.trim() !== "") {
-                db.ref('chat').push({ user: myNick, text: e.target.value });
-                e.target.value = "";
-            }
-        }
+        db.ref('chat').limitToLast(20).on('child_added', s => {
+            const cb = document.getElementById('chat-box');
+            cb.innerHTML += `<div><b>${s.val().user}:</b> ${s.val().text}</div>`;
+            cb.scrollTop = cb.scrollHeight;
+        });
 
-        db.ref('chat').on('child_added', s => {
-            const cbox = document.getElementById('chat-box');
-            cbox.innerHTML += `<div><b>${s.val().user}:</b> ${s.val().text}</div>`;
-            cbox.scrollTop = cbox.scrollHeight;
+        // Вивід активних промо в адмінці
+        db.ref('promos').on('value', s => {
+            const div = document.getElementById('active-promos');
+            div.innerHTML = "Активні коди: ";
+            s.forEach(p => { div.innerHTML += p.key + " (" + p.val().type + "), "; });
         });
     </script>
 </body>
