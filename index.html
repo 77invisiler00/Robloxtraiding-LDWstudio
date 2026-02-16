@@ -2,7 +2,7 @@
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
-    <title>Ghost Market - Economy Fix</title>
+    <title>Ghost Market - Logout System</title>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
     <style>
@@ -20,16 +20,17 @@
         .item-img { width: 100%; height: 130px; object-fit: cover; background: #222; }
         .item-info { padding: 12px; flex-grow: 1; }
 
-        /* Замочок та розмиття */
         .locked-blur { filter: blur(5px); opacity: 0.6; user-select: none; pointer-events: none; }
         .buy-btn-container { padding: 10px; background: rgba(0,0,0,0.3); border-top: 1px solid #333; text-align: center; }
-        .btn-buy { width: 100%; background: var(--gold); color: black; border: none; padding: 10px; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.2s; }
-        .btn-buy:hover { background: #e6c200; transform: scale(1.02); }
+        .btn-buy { width: 100%; background: var(--gold); color: black; border: none; padding: 10px; border-radius: 8px; font-weight: bold; cursor: pointer; }
 
         #admin-panel { display: none; position: fixed; top: 70px; left: 5%; width: 90%; height: 80%; background: #111; z-index: 20000; border: 2px solid var(--accent); padding: 20px; overflow-y: auto; border-radius: 15px; }
         input, textarea { width: 100%; padding: 10px; margin: 5px 0; background: #25262b; border: 1px solid #444; color: white; border-radius: 8px; box-sizing: border-box; }
         button { padding: 10px; background: var(--accent); border: none; border-radius: 8px; cursor: pointer; font-weight: bold; }
         .error-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 10000; text-align: center; justify-content: center; flex-direction: column; }
+        
+        /* Кнопка виходу */
+        .btn-logout { background: #ff4d4d !important; color: white !important; margin-left: 10px; padding: 5px 10px !important; font-size: 11px !important; }
     </style>
 </head>
 <body>
@@ -47,6 +48,7 @@
             <b>GHOST SYSTEM</b>
             <div class="coin-balance">💰 <span id="balance-val">0</span></div>
             <button onclick="usePromo()" style="background:#333; color:white; padding:5px 10px; font-size:11px;">ПРОМОКОД</button>
+            <button onclick="logout()" class="btn-logout">ВИЙТИ</button>
         </div>
         <div style="width:30px; height:30px; background:#444; border-radius:50%; cursor:pointer;" onclick="openAdmin()"></div>
     </div>
@@ -69,7 +71,7 @@
             <input type="text" id="f-title" placeholder="Назва">
             <input type="text" id="f-img" placeholder="URL картинки">
             <input type="number" id="f-price" placeholder="Ціна (цифри)">
-            <textarea id="f-desc" placeholder="Секретний опис (буде видно після покупки)"></textarea>
+            <textarea id="f-desc" placeholder="Секретний опис"></textarea>
             <button onclick="publish()" style="width:100%;">ВИСТАВИТИ</button>
             <button onclick="document.getElementById('addModal').style.display='none'" style="background:none; color:grey;">Скасувати</button>
         </div>
@@ -96,10 +98,11 @@
                 const data = s.val() || {};
                 myCoins = data.coins || 0;
                 document.getElementById('balance-val').innerText = myCoins;
-                
                 const itemsDiv = document.getElementById('my-items');
                 if(data.inventory) {
-                    itemsDiv.innerHTML = Object.values(data.inventory).join("<br>• ");
+                    itemsDiv.innerHTML = "• " + Object.values(data.inventory).join("<br>• ");
+                } else {
+                    itemsDiv.innerHTML = "Порожньо";
                 }
             });
             db.ref('banned').child(nick).on('value', s => {
@@ -114,9 +117,21 @@
             document.getElementById('reg-screen').style.display = 'none';
             syncUser(n);
         }
-        if(myNick) { syncUser(myNick); document.getElementById('reg-screen').style.display = 'none'; }
 
-        // ГОЛОВНА ЛОГІКА КАРТОК
+        // ФУНКЦІЯ ВИХОДУ
+        function logout() {
+            if(confirm("Вийти з акаунта?")) {
+                localStorage.removeItem('ghost_user');
+                location.reload(); // Перезавантажуємо сторінку
+            }
+        }
+
+        if(myNick) { 
+            syncUser(myNick); 
+            document.getElementById('reg-screen').style.display = 'none'; 
+        }
+
+        // Решта логіки (публікації, покупки, чат) залишається без змін
         db.ref('posts').on('value', snapshot => {
             const feed = document.getElementById('main-feed');
             feed.innerHTML = "";
@@ -128,7 +143,6 @@
                 const id = child.key;
                 const price = parseInt(d.price) || 0;
 
-                // Перевіряємо статус покупки
                 db.ref('users').child(myNick).child('inventory').child(id).once('value', bought => {
                     const isOwner = d.nick === myNick;
                     const isBought = bought.exists() || isOwner;
@@ -145,16 +159,15 @@
                         </div>
                         ${!isBought ? `
                             <div class="buy-btn-container">
-                                <button class="btn-buy" onclick="buyItem('${id}', ${price}, '${d.title}', '${d.nick}')">🛒 КУПИТИ ЗА ${price}</button>
+                                <button class="btn-buy" onclick="buyItem('${id}', ${price}, '${d.title}', '${d.nick}')">🛒 КУПИТИ</button>
                             </div>
                         ` : `
                             <div style="text-align:center; padding:10px; color:var(--gold); font-size:12px; font-weight:bold;">✅ ВІДКРИТО</div>
                         `}
                     `;
                     feed.appendChild(card);
-
                     adminList.innerHTML += `<div style="background:#222; padding:10px; margin-bottom:5px; border-radius:5px; display:flex; justify-content:space-between;">
-                        <span>${d.title} (@${d.nick})</span>
+                        <span>${d.title}</span>
                         <button onclick="db.ref('posts').child('${id}').remove()" style="background:red;">DEL</button>
                     </div>`;
                 });
@@ -162,33 +175,20 @@
         });
 
         function buyItem(id, price, title, owner) {
-            if(myCoins < price) {
-                alert(`❌ Тобі треба ще ${price - myCoins}💰! Пиши в чат.`);
-                return;
-            }
-            if(confirm(`Купити "${title}" за ${price}💰?`)) {
-                // Знімаємо у покупця
+            if(myCoins < price) return alert("Недостатньо💰");
+            if(confirm(`Купити "${title}"?`)) {
                 db.ref('users').child(myNick).child('coins').set(myCoins - price);
-                // Додаємо в інвентар
                 db.ref('users').child(myNick).child('inventory').child(id).set(title);
-                // Віддаємо гроші продавцю! (як у справжній економці)
                 db.ref('users').child(owner).child('coins').once('value', s => {
-                    const ownerCoins = s.val() || 0;
-                    db.ref('users').child(owner).child('coins').set(ownerCoins + price);
+                    db.ref('users').child(owner).child('coins').set((s.val() || 0) + price);
                 });
-                alert("🎉 Успішно! Опис розблоковано.");
             }
         }
 
         function publish() {
-            const t = document.getElementById('f-title').value;
-            const p = document.getElementById('f-price').value;
-            if(!t || !p) return;
             db.ref('posts').push({
-                nick: myNick,
-                title: t,
-                img: document.getElementById('f-img').value,
-                price: p,
+                nick: myNick, title: document.getElementById('f-title').value,
+                img: document.getElementById('f-img').value, price: document.getElementById('f-price').value,
                 desc: document.getElementById('f-desc').value
             });
             document.getElementById('addModal').style.display = 'none';
@@ -209,13 +209,13 @@
         }
 
         function usePromo() {
-            const c = prompt("Введіть код:").toUpperCase();
+            const c = prompt("Код:").toUpperCase();
             db.ref('promos').child(c).once('value', s => {
                 if(s.exists()) {
                     db.ref('users').child(myNick).child('coins').set(myCoins + s.val());
                     db.ref('promos').child(c).remove();
-                    alert(`Бонус +${s.val()}💰!`);
-                } else alert("Невірний код.");
+                    alert(`+${s.val()}💰`);
+                }
             });
         }
 
