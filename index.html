@@ -2,7 +2,7 @@
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
-    <title>Ghost Market - Shop System</title>
+    <title>Ghost Market - Economy Fix</title>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
     <style>
@@ -15,17 +15,16 @@
         .wrapper { display: grid; grid-template-columns: 220px 1fr 300px; height: calc(100vh - 60px); }
         .feed { padding: 20px; overflow-y: auto; display: flex; flex-wrap: wrap; gap: 20px; align-content: flex-start; }
         
-        /* Картки товарів */
-        .item-card { background: var(--panel); width: 230px; border-radius: 12px; border: 1px solid #333; overflow: hidden; position: relative; transition: 0.3s; height: fit-content; }
-        .item-card:hover { border-color: var(--accent); transform: translateY(-3px); }
-        .price-tag { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.8); padding: 4px 8px; border-radius: 6px; color: var(--gold); font-size: 12px; font-weight: bold; z-index: 10; }
+        .item-card { background: var(--panel); width: 230px; border-radius: 12px; border: 1px solid #333; overflow: hidden; position: relative; transition: 0.3s; min-height: 250px; display: flex; flex-direction: column; }
+        .price-tag { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.8); padding: 4px 8px; border-radius: 6px; color: var(--gold); font-size: 12px; font-weight: bold; z-index: 10; border: 1px solid var(--gold); }
         .item-img { width: 100%; height: 130px; object-fit: cover; background: #222; }
-        .item-info { padding: 12px; }
+        .item-info { padding: 12px; flex-grow: 1; }
 
-        /* Логіка замочка */
-        .locked-content { filter: blur(4px); pointer-events: none; user-select: none; opacity: 0.5; }
-        .buy-overlay { position: absolute; bottom: 0; left: 0; width: 100%; height: 60px; background: linear-gradient(transparent, rgba(0,0,0,0.9)); display: flex; align-items: center; justify-content: center; z-index: 5; }
-        .btn-buy { background: var(--gold); color: black; border: none; padding: 8px 15px; border-radius: 5px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 5px; }
+        /* Замочок та розмиття */
+        .locked-blur { filter: blur(5px); opacity: 0.6; user-select: none; pointer-events: none; }
+        .buy-btn-container { padding: 10px; background: rgba(0,0,0,0.3); border-top: 1px solid #333; text-align: center; }
+        .btn-buy { width: 100%; background: var(--gold); color: black; border: none; padding: 10px; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        .btn-buy:hover { background: #e6c200; transform: scale(1.02); }
 
         #admin-panel { display: none; position: fixed; top: 70px; left: 5%; width: 90%; height: 80%; background: #111; z-index: 20000; border: 2px solid var(--accent); padding: 20px; overflow-y: auto; border-radius: 15px; }
         input, textarea { width: 100%; padding: 10px; margin: 5px 0; background: #25262b; border: 1px solid #444; color: white; border-radius: 8px; box-sizing: border-box; }
@@ -36,58 +35,53 @@
 <body>
 
     <div id="reg-screen" style="position:fixed; width:100%; height:100%; background:var(--bg); z-index:30000; display:flex; align-items:center; justify-content:center;">
-        <div style="background:var(--panel); padding:30px; border-radius:15px; text-align:center; width:300px;">
-            <h2>Ghost Market</h2>
-            <input type="text" id="user-login" placeholder="Введіть нікнейм">
+        <div style="background:var(--panel); padding:30px; border-radius:15px; text-align:center; width:300px; border: 1px solid #444;">
+            <h2 style="color:var(--accent);">Ghost Market</h2>
+            <input type="text" id="user-login" placeholder="Ваш нікнейм">
             <button onclick="startSession()" style="width:100%; margin-top:10px;">ПОЧАТИ</button>
         </div>
     </div>
 
     <div class="header">
         <div style="display:flex; gap:15px; align-items:center;">
-            <b style="color:var(--accent);">GHOST SYSTEM</b>
+            <b>GHOST SYSTEM</b>
             <div class="coin-balance">💰 <span id="balance-val">0</span></div>
-            <button onclick="usePromo()" style="background:#333; color:white; font-size:11px;">ПРОМОКОД</button>
+            <button onclick="usePromo()" style="background:#333; color:white; padding:5px 10px; font-size:11px;">ПРОМОКОД</button>
         </div>
         <div style="width:30px; height:30px; background:#444; border-radius:50%; cursor:pointer;" onclick="openAdmin()"></div>
     </div>
 
-    <div class="wrapper">
+    <div class="wrapper" id="main-wrapper">
         <div class="side" style="padding:15px; border-right:1px solid #333;">
-            <h4>Інвентар</h4>
-            <div id="my-items" style="font-size:12px; color:#888;">Поки порожньо...</div>
+            <h4>Куплені речі</h4>
+            <div id="my-items" style="font-size:12px; color:#888;"></div>
         </div>
         <div class="feed" id="main-feed"></div>
         <div class="chat" style="background:var(--panel); display:flex; flex-direction:column; border-left:1px solid #333;">
             <div id="chat-box" style="flex:1; padding:15px; overflow-y:auto;"></div>
-            <input type="text" id="chat-input" placeholder="Пиши сюди (+10💰)..." onkeypress="sendChat(event)" style="border-radius:0; border:none; border-top:1px solid #333;">
+            <input type="text" id="chat-input" placeholder="Чат (+10💰)..." onkeypress="sendChat(event)" style="border-radius:0; border:none; border-top:1px solid #333; padding:15px; background:#1a1b21; color:white;">
         </div>
     </div>
 
     <div id="addModal" class="error-overlay" style="background:rgba(0,0,0,0.8); z-index:15000;">
         <div style="background:var(--panel); padding:25px; border-radius:15px; width:350px;">
-            <h3>Виставити на продаж</h3>
+            <h3>Новий товар</h3>
             <input type="text" id="f-title" placeholder="Назва">
-            <input type="text" id="f-img" placeholder="Посилання на фото">
-            <input type="number" id="f-price" placeholder="Ціна (тільки цифри)">
-            <textarea id="f-desc" placeholder="Секретний опис (видно після покупки)"></textarea>
+            <input type="text" id="f-img" placeholder="URL картинки">
+            <input type="number" id="f-price" placeholder="Ціна (цифри)">
+            <textarea id="f-desc" placeholder="Секретний опис (буде видно після покупки)"></textarea>
             <button onclick="publish()" style="width:100%;">ВИСТАВИТИ</button>
             <button onclick="document.getElementById('addModal').style.display='none'" style="background:none; color:grey;">Скасувати</button>
         </div>
     </div>
 
     <div id="admin-panel">
-        <div style="display:flex; justify-content:space-between;"><h2>Адмін-центр</h2><button onclick="this.parentElement.parentElement.style.display='none'">Закрити</button></div>
-        <div style="background:#222; padding:15px; border-radius:10px; margin-bottom:20px;">
-            <h4>Створити Промо</h4>
-            <input type="text" id="p-code" placeholder="Код">
-            <input type="number" id="p-amount" placeholder="Кількість монет">
-            <button onclick="createPromo()">Створити</button>
-        </div>
-        <div id="admin-list"></div>
+        <div style="display:flex; justify-content:space-between;"><h2>Адмінка</h2><button onclick="this.parentElement.parentElement.style.display='none'">X</button></div>
+        <input type="text" id="p-code" placeholder="Код"><input type="number" id="p-amount" placeholder="Сума"><button onclick="createPromo()">Створити промо</button>
+        <div id="admin-list" style="margin-top:20px;"></div>
     </div>
 
-    <div id="errScr" class="error-overlay"><h1>🔒 BAN</h1><p>Доступ обмежено.</p></div>
+    <div id="errScr" class="error-overlay"><h1>🔒 BAN</h1></div>
     <button style="position:fixed; bottom:20px; right:320px; width:60px; height:60px; border-radius:50%; background:var(--accent); border:none; font-size:30px; cursor:pointer;" onclick="document.getElementById('addModal').style.display='flex'">+</button>
 
     <script>
@@ -99,12 +93,13 @@
 
         function syncUser(nick) {
             db.ref('users').child(nick).on('value', s => {
-                myCoins = (s.val() && s.val().coins) || 0;
+                const data = s.val() || {};
+                myCoins = data.coins || 0;
                 document.getElementById('balance-val').innerText = myCoins;
-                // Оновлюємо список куплених речей
+                
                 const itemsDiv = document.getElementById('my-items');
-                if(s.val() && s.val().inventory) {
-                    itemsDiv.innerHTML = "<b>Куплено:</b><br>" + Object.values(s.val().inventory).join(", ");
+                if(data.inventory) {
+                    itemsDiv.innerHTML = Object.values(data.inventory).join("<br>• ");
                 }
             });
             db.ref('banned').child(nick).on('value', s => {
@@ -121,63 +116,84 @@
         }
         if(myNick) { syncUser(myNick); document.getElementById('reg-screen').style.display = 'none'; }
 
-        // ПУБЛІКАЦІЯ ТА ПОКУПКА
+        // ГОЛОВНА ЛОГІКА КАРТОК
         db.ref('posts').on('value', snapshot => {
             const feed = document.getElementById('main-feed');
             feed.innerHTML = "";
+            const adminList = document.getElementById('admin-list');
+            adminList.innerHTML = "<h4>Керування:</h4>";
+
             snapshot.forEach(child => {
                 const d = child.val();
                 const id = child.key;
                 const price = parseInt(d.price) || 0;
 
-                // Перевіряємо, чи юзер вже купив цей товар
+                // Перевіряємо статус покупки
                 db.ref('users').child(myNick).child('inventory').child(id).once('value', bought => {
-                    const isBought = bought.exists() || d.nick === myNick;
+                    const isOwner = d.nick === myNick;
+                    const isBought = bought.exists() || isOwner;
                     
                     const card = document.createElement('div');
                     card.className = 'item-card';
                     card.innerHTML = `
                         <div class="price-tag">💰 ${price}</div>
-                        <img src="${d.img}" class="item-img" onerror="this.src='https://via.placeholder.com/230x130?text=Ghost+Item'">
-                        <div class="item-info ${!isBought ? 'locked-content' : ''}">
+                        <img src="${d.img}" class="item-img" onerror="this.src='https://via.placeholder.com/230x130?text=No+Photo'">
+                        <div class="item-info ${!isBought ? 'locked-blur' : ''}">
                             <b>${d.title}</b><br>
-                            <small>${isBought ? d.desc : '🔒 Вміст заблоковано'}</small><br>
-                            <span style="color:var(--accent); font-size:11px;">@${d.nick}</span>
+                            <p style="font-size:12px; margin-top:5px;">${isBought ? d.desc : '🔒 Купіть, щоб відкрити опис'}</p>
+                            <span style="color:var(--accent); font-size:11px;">Автор: @${d.nick}</span>
                         </div>
-                        ${!isBought ? `<div class="buy-overlay"><button class="btn-buy" onclick="buyItem('${id}', ${price}, '${d.title}')">🛒 КУПИТИ</button></div>` : ''}
+                        ${!isBought ? `
+                            <div class="buy-btn-container">
+                                <button class="btn-buy" onclick="buyItem('${id}', ${price}, '${d.title}', '${d.nick}')">🛒 КУПИТИ ЗА ${price}</button>
+                            </div>
+                        ` : `
+                            <div style="text-align:center; padding:10px; color:var(--gold); font-size:12px; font-weight:bold;">✅ ВІДКРИТО</div>
+                        `}
                     `;
                     feed.appendChild(card);
+
+                    adminList.innerHTML += `<div style="background:#222; padding:10px; margin-bottom:5px; border-radius:5px; display:flex; justify-content:space-between;">
+                        <span>${d.title} (@${d.nick})</span>
+                        <button onclick="db.ref('posts').child('${id}').remove()" style="background:red;">DEL</button>
+                    </div>`;
                 });
             });
         });
 
-        function buyItem(id, price, title) {
+        function buyItem(id, price, title, owner) {
             if(myCoins < price) {
-                alert("❌ Недостатньо монет! Пиши в чат, щоб заробити.");
+                alert(`❌ Тобі треба ще ${price - myCoins}💰! Пиши в чат.`);
                 return;
             }
             if(confirm(`Купити "${title}" за ${price}💰?`)) {
+                // Знімаємо у покупця
                 db.ref('users').child(myNick).child('coins').set(myCoins - price);
+                // Додаємо в інвентар
                 db.ref('users').child(myNick).child('inventory').child(id).set(title);
-                alert("✅ Успішно куплено! Опис розблоковано.");
+                // Віддаємо гроші продавцю! (як у справжній економці)
+                db.ref('users').child(owner).child('coins').once('value', s => {
+                    const ownerCoins = s.val() || 0;
+                    db.ref('users').child(owner).child('coins').set(ownerCoins + price);
+                });
+                alert("🎉 Успішно! Опис розблоковано.");
             }
         }
 
         function publish() {
-            const title = document.getElementById('f-title').value;
-            const price = document.getElementById('f-price').value;
-            if(!title || !price) return alert("Заповни назву та ціну!");
+            const t = document.getElementById('f-title').value;
+            const p = document.getElementById('f-price').value;
+            if(!t || !p) return;
             db.ref('posts').push({
                 nick: myNick,
-                title: title,
+                title: t,
                 img: document.getElementById('f-img').value,
-                price: price,
+                price: p,
                 desc: document.getElementById('f-desc').value
             });
             document.getElementById('addModal').style.display = 'none';
         }
 
-        // ІНШЕ (Чат, Промо, Адмінка)
         function sendChat(e) {
             if(e.key === 'Enter' && e.target.value.trim() !== "") {
                 db.ref('chat').push({ user: myNick, text: e.target.value });
@@ -198,8 +214,8 @@
                 if(s.exists()) {
                     db.ref('users').child(myNick).child('coins').set(myCoins + s.val());
                     db.ref('promos').child(c).remove();
-                    alert(`+${s.val()} монет!`);
-                } else alert("Код недійсний.");
+                    alert(`Бонус +${s.val()}💰!`);
+                } else alert("Невірний код.");
             });
         }
 
@@ -211,5 +227,4 @@
         });
     </script>
 </body>
-</html> 
-
+</html>
